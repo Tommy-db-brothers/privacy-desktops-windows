@@ -24,7 +24,20 @@ internal sealed class FakeDesktopService : IDesktopService
 
     public Guid this[string name] => Desktops.Single(d => d.Name == name).Id;
 
+    public int ReconnectCount { get; private set; }
+
+    public bool FailReconnect { get; set; }
+
     public void Start() => Started = true;
+
+    public void Reconnect()
+    {
+        ReconnectCount++;
+        if (FailReconnect)
+        {
+            throw new InvalidOperationException("RegisterPostMessageHook failed.");
+        }
+    }
 
     public IReadOnlyList<DesktopInfo> GetDesktops() => Desktops.ToList();
 
@@ -83,6 +96,11 @@ internal sealed class FakeVerifier : IVerifier
     public List<Prompt> Prompts { get; } = [];
 
     public Prompt Last => Prompts[^1];
+
+    public VerifierStatus Status { get; set; } = VerifierStatus.Ready;
+
+    public Task<VerifierStatus> CheckAvailabilityAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Status);
 
     public Task<VerificationResult> VerifyAsync(nint ownerWindow, string message, CancellationToken cancellationToken = default)
     {

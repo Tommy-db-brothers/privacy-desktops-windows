@@ -11,6 +11,25 @@ namespace DeskVeil.Guard;
 /// </summary>
 internal sealed class HelloVerifier : IVerifier
 {
+    public async Task<VerifierStatus> CheckAvailabilityAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var availability = await UserConsentVerifier.CheckAvailabilityAsync().AsTask(cancellationToken).ConfigureAwait(true);
+            return availability switch
+            {
+                UserConsentVerifierAvailability.Available or UserConsentVerifierAvailability.DeviceBusy => VerifierStatus.Ready,
+                UserConsentVerifierAvailability.DisabledByPolicy => new VerifierStatus(false, false, DescribeAvailability(availability)),
+                _ => new VerifierStatus(false, true, DescribeAvailability(availability)),
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Error("Checking Windows Hello availability failed", ex);
+            return new VerifierStatus(false, false, $"Windows Hello gaf een fout: {ex.Message}");
+        }
+    }
+
     public async Task<VerificationResult> VerifyAsync(nint ownerWindow, string message, CancellationToken cancellationToken = default)
     {
         try

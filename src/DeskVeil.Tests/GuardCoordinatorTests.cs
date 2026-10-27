@@ -318,4 +318,74 @@ public sealed class GuardCoordinatorTests : IDisposable
         await accepted;
         Assert.False(_guard.IsLocked(Muziek));
     }
+
+    [Fact]
+    public async Task Locking_without_a_verification_method_asks_to_set_up_hello_and_does_not_lock()
+    {
+        _guard.Start();
+        VerifierStatus? raised = null;
+        _guard.VerifierSetupRequired += (_, status) => raised = status;
+        _verifier.Status = new VerifierStatus(false, true, "Windows Hello is niet ingesteld.");
+
+        await _guard.ToggleLockAsync(Prive);
+
+        Assert.False(_guard.IsLocked(Prive));
+        Assert.NotNull(raised);
+        Assert.True(raised!.UserCanSetUp);
+        Assert.Equal("Windows Hello is niet ingesteld.", raised.Detail);
+    }
+
+    [Fact]
+    public void Shell_restart_reconnects_and_rereads_the_desktops()
+    {
+        StartWithLocked(Muziek);
+        _desktops.Desktops.RemoveAll(d => d.Id == Muziek);
+
+        _guard.HandleShellRestarted();
+
+        Assert.Equal(1, _desktops.ReconnectCount);
+        Assert.False(_store.Config.Desktops.ContainsKey(Muziek));
+        Assert.False(_curtain.IsShown);
+    }
+
+    [Fact]
+    public void Shell_restart_enforces_at_once_when_the_current_desktop_is_locked()
+    {
+        StartWithLocked(Prive);
+
+        // The switch happened while the shell was down, so no event arrived for it.
+        _desktops.Current = Prive;
+        _guard.HandleShellRestarted();
+
+        Assert.Equal(Prive, _guard.CurrentDesktopId);
+        Assert.True(_curtain.IsShown);
+        Assert.Equal("Privé", _curtain.Content!.DesktopName);
+        Assert.Single(_verifier.Prompts);
+    }
+
+    [Fact]
+    public void Shell_restart_keeps_a_desktop_that_was_unlocked_for_this_session_open()
+    {
+        StartWithLocked(Prive);
+        _desktops.Arrive(Prive);
+        _verifier.Last.Complete(VerificationOutcome.Verified);
+
+        _guard.HandleShellRestarted();
+
+        Assert.False(_curtain.IsShown);
+        Assert.Single(_verifier.Prompts);
+    }
+
+    [Fact]
+    public void Shell_restart_with_a_failed_reconnect_notifies_and_still_enforces()
+    {
+        StartWithLocked(Prive);
+        _desktops.FailReconnect = true;
+        _desktops.Current = Prive;
+
+        _guard.HandleShellRestarted();
+
+        Assert.Single(_notifications);
+        Assert.True(_curtain.IsShown);
+    }
 }

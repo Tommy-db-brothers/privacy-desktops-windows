@@ -1,4 +1,3 @@
-using System.Text;
 using DeskVeil.Diagnostics;
 
 namespace DeskVeil.Desktops;
@@ -7,27 +6,56 @@ namespace DeskVeil.Desktops;
 public sealed class VirtualDesktopService : IDesktopService
 {
     // WM_APP + 0x2D1; WM_APP..0xBFFF is reserved for private application messages.
-    private const int DesktopSwitchedMessage = 0x8000 + 0x2D1;
+    internal const int DesktopSwitchedMessage = 0x8000 + 0x2D1;
 
-    private DesktopSwitchListener? _listener;
+    private readonly IVirtualDesktopApi _api;
+    private readonly Func<int, IDesktopSwitchListener> _createListener;
+    private IDesktopSwitchListener? _listener;
     private Guid? _lastKnownCurrent;
+
+    public VirtualDesktopService()
+        : this(new NativeVirtualDesktopApi(), messageId => new DesktopSwitchListener(messageId))
+    {
+    }
+
+    internal VirtualDesktopService(IVirtualDesktopApi api, Func<int, IDesktopSwitchListener> createListener)
+    {
+        _api = api;
+        _createListener = createListener;
+    }
 
     public event EventHandler<DesktopChangedEventArgs>? CurrentDesktopChanged;
 
-    /// <summary>Checks that the DLL loads and talks to the shell.</summary>
+    /// <summary>
+    /// Checks the Windows build first (an unsupported build can crash inside the DLL instead of
+    /// returning an error) and then that the DLL loads and can read the desktops.
+    /// </summary>
     /// <returns>Null when usable, otherwise a message for the user.</returns>
-    public static string? CheckAvailability()
+    public static string? CheckAvailability(WindowsBuild build) =>
+        CheckAvailability(build, () => VirtualDesktopAccessor.GetDesktopCount());
+
+    internal static string? CheckAvailability(WindowsBuild build, Func<int> getDesktopCount)
     {
+        if (!build.IsSupported)
+        {
+            Log.Warn($"Unsupported Windows build {build}.");
+            return $"DeskVeil werkt niet op deze Windows-versie: {build}.\n\n" +
+                   $"Nodig is Windows 11 24H2 (build {WindowsBuild.MinimumBuild}.{WindowsBuild.MinimumRevision}) of nieuwer. " +
+                   "Installeer de laatste Windows-updates en probeer het opnieuw.";
+        }
+
         try
         {
-            return VirtualDesktopAccessor.GetDesktopCount() > 0
+            return getDesktopCount() > 0
                 ? null
-                : "VirtualDesktopAccessor.dll kon de virtuele bureaubladen niet uitlezen. Wordt deze Windows-build ondersteund (Windows 11 24H2 of nieuwer)?";
+                : $"VirtualDesktopAccessor.dll kan de virtuele bureaubladen niet uitlezen op {build}. " +
+                  "Mogelijk heeft een Windows-update de interne interfaces gewijzigd; kijk of er een nieuwere DeskVeil is.";
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
         {
             Log.Error("VirtualDesktopAccessor.dll could not be loaded", ex);
-            return $"VirtualDesktopAccessor.dll kon niet geladen worden ({ex.GetType().Name}). Staat de x64-DLL naast DeskVeil.exe?";
+            return $"VirtualDesktopAccessor.dll kon niet geladen worden ({ex.GetType().Name}) op {build}. " +
+                   "Installeer DeskVeil opnieuw; de 64-bits DLL hoort naast DeskVeil.exe te staan.";
         }
     }
 
@@ -38,50 +66,70 @@ public sealed class VirtualDesktopService : IDesktopService
             return;
         }
 
-        _listener = new DesktopSwitchListener(DesktopSwitchedMessage);
-        _listener.DesktopSwitched += OnDesktopSwitched;
-        if (VirtualDesktopAccessor.RegisterPostMessageHook(_listener.Handle, DesktopSwitchedMessage) != 1)
+        var listener = _createListener(DesktopSwitchedMessage);
+        if (_api.RegisterPostMessageHook(listener.Handle, DesktopSwitchedMessage) != 1)
         {
-            _listener.Dispose();
-            _listener = null;
+            listener.Dispose();
             throw new InvalidOperationException("RegisterPostMessageHook failed.");
         }
 
+        listener.DesktopSwitched += OnDesktopSwitched;
+        _listener = listener;
         _lastKnownCurrent = GetCurrentDesktopId();
         Log.Info($"Listening for desktop switches; current desktop {_lastKnownCurrent?.ToString() ?? "unknown"}.");
     }
 
+    public void Reconnect()
+    {
+        if (_listener is null)
+        {
+            Start();
+            return;
+        }
+
+        // The DLL keeps one notification registration for all listeners; removing the only listener
+        // tears it down and registering again builds a fresh one against the new shell.
+        _api.UnregisterPostMessageHook(_listener.Handle);
+        if (_api.RegisterPostMessageHook(_listener.Handle, DesktopSwitchedMessage) != 1)
+        {
+            throw new InvalidOperationException("RegisterPostMessageHook failed after the shell restarted.");
+        }
+
+        _lastKnownCurrent = GetCurrentDesktopId();
+        Log.Info($"Desktop switch listener registered again; current desktop {_lastKnownCurrent?.ToString() ?? "unknown"}.");
+    }
+
     public IReadOnlyList<DesktopInfo> GetDesktops()
     {
-        var count = VirtualDesktopAccessor.GetDesktopCount();
+        var count = _api.GetDesktopCount();
         if (count <= 0)
         {
             return [];
         }
 
         var desktops = new List<DesktopInfo>(count);
-        var buffer = new byte[1024];
         for (var number = 0; number < count; number++)
         {
-            var id = VirtualDesktopAccessor.GetDesktopIdByNumber(number);
+            var id = _api.GetDesktopIdByNumber(number);
             if (id == Guid.Empty)
             {
                 // The set of desktops changed while enumerating; report "unknown" rather than a partial list.
                 return [];
             }
-            desktops.Add(new DesktopInfo(id, number, ReadName(number, buffer)));
+            var name = _api.GetDesktopName(number);
+            desktops.Add(new DesktopInfo(id, number, string.IsNullOrWhiteSpace(name) ? $"Bureaublad {number + 1}" : name));
         }
         return desktops;
     }
 
     public Guid? GetCurrentDesktopId()
     {
-        var number = VirtualDesktopAccessor.GetCurrentDesktopNumber();
+        var number = _api.GetCurrentDesktopNumber();
         if (number < 0)
         {
             return null;
         }
-        var id = VirtualDesktopAccessor.GetDesktopIdByNumber(number);
+        var id = _api.GetDesktopIdByNumber(number);
         return id == Guid.Empty ? null : id;
     }
 
@@ -93,7 +141,7 @@ public sealed class VirtualDesktopService : IDesktopService
             Log.Warn($"Cannot switch to desktop {desktopId}: it no longer exists.");
             return false;
         }
-        return VirtualDesktopAccessor.GoToDesktopNumber(target.Index) == 1;
+        return _api.GoToDesktopNumber(target.Index) == 1;
     }
 
     public void Dispose()
@@ -102,7 +150,7 @@ public sealed class VirtualDesktopService : IDesktopService
         {
             return;
         }
-        VirtualDesktopAccessor.UnregisterPostMessageHook(_listener.Handle);
+        _api.UnregisterPostMessageHook(_listener.Handle);
         _listener.DesktopSwitched -= OnDesktopSwitched;
         _listener.Dispose();
         _listener = null;
@@ -121,14 +169,5 @@ public sealed class VirtualDesktopService : IDesktopService
 
         Log.Info($"Desktop switched: #{e.OldNumber} -> #{e.NewNumber}, {previous?.ToString() ?? "?"} -> {current?.ToString() ?? "?"}.");
         CurrentDesktopChanged?.Invoke(this, new DesktopChangedEventArgs(previous, current));
-    }
-
-    private static string ReadName(int number, byte[] buffer)
-    {
-        Array.Clear(buffer);
-        var name = VirtualDesktopAccessor.GetDesktopName(number, buffer, (nuint)buffer.Length) == 1
-            ? Encoding.UTF8.GetString(buffer, 0, Math.Max(0, Array.IndexOf(buffer, (byte)0)))
-            : string.Empty;
-        return string.IsNullOrWhiteSpace(name) ? $"Bureaublad {number + 1}" : name;
     }
 }

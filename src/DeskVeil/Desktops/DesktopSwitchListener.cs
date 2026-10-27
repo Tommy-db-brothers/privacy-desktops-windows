@@ -1,7 +1,7 @@
 namespace DeskVeil.Desktops;
 
 /// <summary>Message-only window that receives the desktop-switch messages posted by VirtualDesktopAccessor.</summary>
-internal sealed class DesktopSwitchListener : NativeWindow, IDisposable
+internal sealed class DesktopSwitchListener : NativeWindow, IDesktopSwitchListener
 {
     private static readonly nint HWND_MESSAGE = -3;
 
@@ -13,7 +13,6 @@ internal sealed class DesktopSwitchListener : NativeWindow, IDisposable
         CreateHandle(new CreateParams { Caption = "DeskVeil.DesktopSwitchListener", Parent = HWND_MESSAGE });
     }
 
-    /// <summary>Raised with the (old, new) desktop numbers as reported by the DLL.</summary>
     public event EventHandler<(int OldNumber, int NewNumber)>? DesktopSwitched;
 
     protected override void WndProc(ref Message m)
