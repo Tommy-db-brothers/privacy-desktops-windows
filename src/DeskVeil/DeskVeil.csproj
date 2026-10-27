@@ -25,10 +25,11 @@
     <LibDir>$(MSBuildThisFileDirectory)..\..\lib\</LibDir>
     <VdaReleaseTag>2024-12-16-windows11</VdaReleaseTag>
     <VdaDllPath>$(LibDir)VirtualDesktopAccessor.dll</VdaDllPath>
+    <VdaSha256>8740C572A1C000E3B87FFEB1E4C397EAE9AF3BD4A2ABDC3BCFFACAB4493F8FF5</VdaSha256>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(VdaDllPath)" Condition="Exists('$(VdaDllPath)') Or '$(SkipVdaFetch)' != 'true'" Link="VirtualDesktopAccessor.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(VdaDllPath)" Link="VirtualDesktopAccessor.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
     <None Include="$(LibDir)VirtualDesktopAccessor.LICENSE.txt" Link="VirtualDesktopAccessor.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 
@@ -37,15 +38,23 @@
   </ItemGroup>
 
   <!--
-    lib/VirtualDesktopAccessor.dll is meant to be committed. If a clone does not have it,
-    fetch the pinned release once (see lib/README.md). Skip with -p:SkipVdaFetch=true.
+    lib/VirtualDesktopAccessor.dll is committed. Should a checkout lack it, the pinned release is
+    downloaded. Either way the build fails unless the file matches VdaSha256.
   -->
-  <Target Name="FetchVirtualDesktopAccessor" BeforeTargets="BeforeBuild" Condition="!Exists('$(VdaDllPath)') And '$(SkipVdaFetch)' != 'true'">
+  <Target Name="FetchVirtualDesktopAccessor" BeforeTargets="BeforeBuild" Condition="!Exists('$(VdaDllPath)')">
     <Message Importance="high" Text="lib/VirtualDesktopAccessor.dll missing; downloading release $(VdaReleaseTag)." />
     <DownloadFile SourceUrl="https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/$(VdaReleaseTag)/VirtualDesktopAccessor.dll"
                   DestinationFolder="$(LibDir)"
                   Retries="3"
                   RetryDelayMilliseconds="2000" />
+  </Target>
+
+  <Target Name="VerifyVirtualDesktopAccessor" BeforeTargets="BeforeBuild" DependsOnTargets="FetchVirtualDesktopAccessor">
+    <GetFileHash Files="$(VdaDllPath)" Algorithm="SHA256">
+      <Output TaskParameter="Hash" PropertyName="VdaActualSha256" />
+    </GetFileHash>
+    <Error Condition="'$(VdaActualSha256.ToUpperInvariant())' != '$(VdaSha256.ToUpperInvariant())'"
+           Text="lib/VirtualDesktopAccessor.dll has SHA-256 $(VdaActualSha256), expected $(VdaSha256) (release $(VdaReleaseTag)). Restore the pinned file or update VdaReleaseTag and VdaSha256 together." />
   </Target>
 
 </Project>
