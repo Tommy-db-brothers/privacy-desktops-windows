@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
@@ -17,6 +21,8 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,11 +30,32 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      # Tag v0.2.0 -> 0.2.0. Other builds: VersionPrefix from Directory.Build.props + "-ci.<run number>".
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          } else {
+            [xml]$props = Get-Content Directory.Build.props
+            $version = "$($props.Project.PropertyGroup.VersionPrefix)-ci.$env:GITHUB_RUN_NUMBER"
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+            throw "'$version' is not a valid version (expected a tag like v0.2.0)."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $version"
+
+      - name: VirtualDesktopAccessor.dll SHA-256
+        shell: pwsh
+        run: Get-FileHash lib\VirtualDesktopAccessor.dll -Algorithm SHA256 | Format-List Algorithm, Hash
+
       - name: Restore
         run: dotnet restore DeskVeil.sln
 
       - name: Build
-        run: dotnet build DeskVeil.sln -c Release --no-restore
+        run: dotnet build DeskVeil.sln -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Test
         run: dotnet test DeskVeil.sln -c Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
@@ -40,30 +67,84 @@ jobs:
           name: test-results
           path: TestResults
 
+      - name: Publish portable single-file exe
+        run: >
+          dotnet publish src/DeskVeil/DeskVeil.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:Version=${{ steps.version.outputs.version }} -o artifacts/portable
+
+      # The installer ships a regular self-contained folder: no self-extraction to %TEMP% at startup.
+      - name: Publish app folder for the installer
+        run: >
+          dotnet publish src/DeskVeil/DeskVeil.csproj -c Release -r win-x64 --self-contained true
+          -p:Version=${{ steps.version.outputs.version }} -o artifacts/app
+
+      # Inno Setup 6 is preinstalled on the windows-2022 and windows-2025 runner images
+      # (actions/runner-images, Windows2025-Readme.md "InnoSetup"); install it only if missing.
+      - name: Locate Inno Setup compiler
+        shell: pwsh
+        run: |
+          function Find-Iscc {
+            $onPath = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($onPath) { return $onPath.Source }
+            foreach ($dir in @(${env:ProgramFiles(x86)}, $env:ProgramFiles)) {
+              $candidate = Join-Path $dir 'Inno Setup 6\ISCC.exe'
+              if (Test-Path $candidate) { return $candidate }
+            }
+            return $null
+          }
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            Write-Host 'Inno Setup not found; installing with Chocolatey.'
+            choco install innosetup -y --no-progress
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { throw 'ISCC.exe not found after installing Inno Setup.' }
+          Write-Host "Using $iscc"
+          "ISCC=$iscc" >> $env:GITHUB_ENV
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & $env:ISCC "/DAppVersion=${{ steps.version.outputs.version }}" "/DSourceDir=..\artifacts\app" "/DOutputDir=..\artifacts\dist" installer\DeskVeil.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+
+      - name: Collect release files and checksums
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          Copy-Item artifacts/portable/DeskVeil.exe "artifacts/dist/DeskVeil-$version-portable-win-x64.exe"
+          Get-ChildItem artifacts/dist -Filter *.exe |
+            Sort-Object Name |
+            ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
+            Set-Content artifacts/dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content artifacts/dist/SHA256SUMS.txt
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeskVeil-${{ steps.version.outputs.version }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/download-artifact@v4
         with:
-          dotnet-version: 8.0.x
-
-      - name: Publish self-contained single-file exe
-        run: >
-          dotnet publish src/DeskVeil/DeskVeil.csproj -c Release -r win-x64 --self-contained true
-          -p:PublishSingleFile=true -o publish
-
-      - name: Name the asset after the tag
-        shell: pwsh
-        run: Copy-Item publish/DeskVeil.exe "DeskVeil-${{ github.ref_name }}-win-x64.exe"
+          name: DeskVeil-${{ needs.build.outputs.version }}
+          path: dist
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: DeskVeil-${{ github.ref_name }}-win-x64.exe
+          name: DeskVeil ${{ needs.build.outputs.version }}
+          files: |
+            dist/DeskVeil-Setup-${{ needs.build.outputs.version }}.exe
+            dist/DeskVeil-${{ needs.build.outputs.version }}-portable-win-x64.exe
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
           generate_release_notes: true
