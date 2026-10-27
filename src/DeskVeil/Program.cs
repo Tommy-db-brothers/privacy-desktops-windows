@@ -17,6 +17,8 @@ internal static class Program
             return 1;
         }
 
+        Log.EnableFileLogging();
+        Log.Info($"DeskVeil {Application.ProductVersion} starting on Windows {Environment.OSVersion.Version}.");
         ApplicationConfiguration.Initialize();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => Log.Error("Unhandled exception on the UI thread", e.Exception);
