@@ -11,6 +11,9 @@ public sealed class DeskVeilConfig
     /// <summary>When true, a desktop unlocked with Windows Hello locks again as soon as you leave it.</summary>
     public bool RelockOnLeave { get; set; } = true;
 
+    /// <summary>False until the welcome window has been shown once.</summary>
+    public bool FirstRunCompleted { get; set; }
+
     /// <summary>Per-desktop settings, keyed by the desktop GUID (never by index or name, both of which shift).</summary>
     public Dictionary<Guid, DesktopEntry> Desktops { get; set; } = [];
 
