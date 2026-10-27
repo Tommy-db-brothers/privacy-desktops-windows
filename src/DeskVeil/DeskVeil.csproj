@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- The versioned TFM is still net8.0-windows; it adds the WinRT projections needed for Windows Hello. -->
+    <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.22000.0</SupportedOSPlatformVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- VirtualDesktopAccessor.dll is x64 only. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>DeskVeil</RootNamespace>
+    <AssemblyName>DeskVeil</AssemblyName>
+  </PropertyGroup>
+
+  <!-- Single-file publish: also bundle the loose native DLL; it is extracted next to the app at startup. -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <LibDir>$(MSBuildThisFileDirectory)..\..\lib\</LibDir>
+    <VdaReleaseTag>2024-12-16-windows11</VdaReleaseTag>
+    <VdaDllPath>$(LibDir)VirtualDesktopAccessor.dll</VdaDllPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(VdaDllPath)" Condition="Exists('$(VdaDllPath)') Or '$(SkipVdaFetch)' != 'true'" Link="VirtualDesktopAccessor.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(LibDir)VirtualDesktopAccessor.LICENSE.txt" Link="VirtualDesktopAccessor.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DeskVeil.Tests" />
+  </ItemGroup>
+
+  <!--
+    lib/VirtualDesktopAccessor.dll is meant to be committed. If a clone does not have it,
+    fetch the pinned release once (see lib/README.md). Skip with -p:SkipVdaFetch=true.
+  -->
+  <Target Name="FetchVirtualDesktopAccessor" BeforeTargets="BeforeBuild" Condition="!Exists('$(VdaDllPath)') And '$(SkipVdaFetch)' != 'true'">
+    <Message Importance="high" Text="lib/VirtualDesktopAccessor.dll missing; downloading release $(VdaReleaseTag)." />
+    <DownloadFile SourceUrl="https://github.com/Ciantic/VirtualDesktopAccessor/releases/download/$(VdaReleaseTag)/VirtualDesktopAccessor.dll"
+                  DestinationFolder="$(LibDir)"
+                  Retries="3"
+                  RetryDelayMilliseconds="2000" />
+  </Target>
+
+</Project>

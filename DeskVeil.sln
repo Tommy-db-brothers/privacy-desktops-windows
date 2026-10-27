@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{69E68BA3-A623-4DC4-B9C7-80F820EBEA6F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeskVeil", "src\DeskVeil\DeskVeil.csproj", "{5724572A-8376-4092-BE80-8032EA7E8C55}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeskVeil.Tests", "src\DeskVeil.Tests\DeskVeil.Tests.csproj", "{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5724572A-8376-4092-BE80-8032EA7E8C55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5724572A-8376-4092-BE80-8032EA7E8C55}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5724572A-8376-4092-BE80-8032EA7E8C55}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5724572A-8376-4092-BE80-8032EA7E8C55}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5724572A-8376-4092-BE80-8032EA7E8C55} = {69E68BA3-A623-4DC4-B9C7-80F820EBEA6F}
+		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C} = {69E68BA3-A623-4DC4-B9C7-80F820EBEA6F}
+	EndGlobalSection
+EndGlobal

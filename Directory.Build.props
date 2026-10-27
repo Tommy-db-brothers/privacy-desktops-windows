@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Lets the Windows-only projects restore and compile on non-Windows build hosts. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Deterministic>true</Deterministic>
+
+    <Version>0.1.0</Version>
+    <Company>dB Brothers</Company>
+    <Product>DeskVeil</Product>
+    <Copyright>Copyright (c) 2026 dB Brothers</Copyright>
+    <RepositoryUrl>https://github.com/Tommy-db-brothers/privacy-desktops-windows</RepositoryUrl>
+  </PropertyGroup>
+</Project>
