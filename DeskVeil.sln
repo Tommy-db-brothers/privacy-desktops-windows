@@ -9,6 +9,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeskVeil", "src\DeskVeil\De
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DeskVeil.Tests", "src\DeskVeil.Tests\DeskVeil.Tests.csproj", "{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{F811F92C-C047-4F96-8B29-62162D903A31}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZBandProbe", "tools\ZBandProbe\ZBandProbe.csproj", "{9776B684-DD90-4659-AC5F-58FCCE5B2BCD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,9 +30,14 @@ Global
 		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9776B684-DD90-4659-AC5F-58FCCE5B2BCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9776B684-DD90-4659-AC5F-58FCCE5B2BCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9776B684-DD90-4659-AC5F-58FCCE5B2BCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9776B684-DD90-4659-AC5F-58FCCE5B2BCD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{5724572A-8376-4092-BE80-8032EA7E8C55} = {69E68BA3-A623-4DC4-B9C7-80F820EBEA6F}
 		{E6E57152-2CB8-48D8-AACA-F3A1B3A5B41C} = {69E68BA3-A623-4DC4-B9C7-80F820EBEA6F}
+		{9776B684-DD90-4659-AC5F-58FCCE5B2BCD} = {F811F92C-C047-4F96-8B29-62162D903A31}
 	EndGlobalSection
 EndGlobal
