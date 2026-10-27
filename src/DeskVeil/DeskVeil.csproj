@@ -12,6 +12,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>DeskVeil</RootNamespace>
     <AssemblyName>DeskVeil</AssemblyName>
+    <ApplicationIcon>DeskVeil.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Single-file publish: also bundle the loose native DLL; it is extracted next to the app at startup. -->
