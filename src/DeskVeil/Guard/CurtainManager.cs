@@ -31,7 +31,9 @@ internal sealed class CurtainManager : ICurtain, IDisposable
     {
         var appearing = _content is null;
         _content = content;
-        if (CurrentScreenSignature() != _screenSignature || (appearing && AnyWindowOffCurrentDesktop()))
+        if (CurrentScreenSignature() != _screenSignature
+            || _windows.Any(w => w.IsDisposed)
+            || (appearing && AnyWindowOffCurrentDesktop()))
         {
             Rebuild();
         }
@@ -97,8 +99,12 @@ internal sealed class CurtainManager : ICurtain, IDisposable
             window.UnlockClicked -= OnUnlockClicked;
             window.BackClicked -= OnBackClicked;
             window.DisplayChanged -= OnDisplayChanged;
-            window.CloseForReal();
-            window.Dispose();
+            if (!window.IsDisposed)
+            {
+                // Windows may already have closed it during shutdown.
+                window.CloseForReal();
+                window.Dispose();
+            }
         }
         _windows.Clear();
     }

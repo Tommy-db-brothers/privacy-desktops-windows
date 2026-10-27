@@ -36,7 +36,17 @@ internal static class Program
         using var guard = new GuardCoordinator(desktops, store, curtain, new HelloVerifier());
         using var tray = new TrayController(guard);
 
-        guard.Start();
+        try
+        {
+            guard.Start();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log.Error("Starting the guard failed", ex);
+            MessageBox.Show($"DeskVeil kon de bureaublad-wissels niet volgen: {ex.Message}", "DeskVeil", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 3;
+        }
+
         if (store.LastBackupPath is not null)
         {
             tray.ShowBalloon($"Het configuratiebestand was beschadigd en is bewaard als '{store.LastBackupPath}'. DeskVeil start met lege instellingen.", ToolTipIcon.Warning);
