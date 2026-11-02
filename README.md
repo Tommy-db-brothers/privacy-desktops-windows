@@ -1,6 +1,6 @@
 # DeskVeil
 
-> **Dreigingsmodel: DeskVeil is een afschrikmiddel tegen meekijkers, geen security boundary.**
+> **Dreigingsmodel: DeskVeil is een afschrikmiddel tegen meekijkers, geen beveiligingsgrens.**
 > **Het draait in dezelfde gebruikerssessie; iemand aan het toetsenbord kan het proces beëindigen.**
 > **Task View-hover-previews kunnen vensters van vergrendelde bureaubladen nog tonen.**
 > Zie [docs/threat-model.md](docs/threat-model.md).
@@ -10,20 +10,79 @@ DeskVeil is een kleine, open-source tray-utility voor Windows 11 die virtuele bu
 elke monitor en vraagt Windows Hello (gezicht, vingerafdruk of pincode) wie je bent. Pas na een
 geslaagde verificatie verdwijnt het gordijn.
 
+## Installeren
+
+Je hebt geen .NET, git, PowerShell of beheerdersrechten nodig.
+
+1. Ga naar de [Releases-pagina](https://github.com/Tommy-db-brothers/privacy-desktops-windows/releases/latest).
+2. Download **`DeskVeil-Setup-<versie>.exe`**.
+3. Dubbelklik op het bestand.
+4. Waarschijnlijk toont Windows **"Windows heeft uw pc beveiligd"** (SmartScreen). Klik op **Meer info** en
+   daarna op **Toch uitvoeren**.
+   *Waarom?* DeskVeil is (nog) niet ondertekend met een betaald code-signing-certificaat, en SmartScreen
+   waarschuwt voor elk onbekend, niet-ondertekend programma. De installer wordt openbaar gebouwd door
+   GitHub Actions uit de broncode in deze repository; op de Releases-pagina staat `SHA256SUMS.txt` om de
+   download te controleren.
+5. Kies desgewenst **Start met Windows** en rond de installatie af. Met **DeskVeil nu starten** aangevinkt
+   verschijnt het slot-icoon direct in het systeemvak.
+
+DeskVeil installeert alleen voor jouw gebruikersaccount, in `%LOCALAPPDATA%\Programs\DeskVeil`; er komt
+geen UAC-prompt. Een nieuwere versie installeer je op dezelfde manier over de oude heen: de installer sluit
+een draaiende DeskVeil eerst af. Je instellingen blijven bewaard.
+
+Liever zonder installatie? Download dan `DeskVeil-<versie>-portable-win-x64.exe` en start die direct.
+
+### Verwijderen
+
+Via **Instellingen > Apps > Geïnstalleerde apps > DeskVeil > Verwijderen**. De uninstaller sluit DeskVeil
+af, verwijdert de autostart en de logbestanden, en vraagt of je ook je instellingen
+(`%APPDATA%\DeskVeil`) wilt verwijderen (standaard: nee).
+
+## Ondersteunde Windows-versies
+
+| Windows | Ondersteund |
+|---|---|
+| Windows 11 25H2 (build 26200) | Ja |
+| Windows 11 24H2 (build 26100.2605 of nieuwer) | Ja |
+| Windows 11 24H2 vóór update 26100.2605 | Nee: installeer eerst de laatste Windows-updates |
+| Windows 11 23H2 en ouder, Windows 10 | Nee |
+| Windows 11 op ARM (ARM64) | Niet getest: DeskVeil en VirtualDesktopAccessor zijn x64 en zouden onder x64-emulatie moeten draaien |
+
+DeskVeil controleert de build bij het starten en legt het uit als je versie niet ondersteund wordt. Je
+build zie je met `winver`. Daarnaast heb je **Windows Hello** nodig (gezicht, vingerafdruk of pincode;
+Instellingen > Accounts > Aanmeldingsopties). Zonder Hello kun je geen bureaublad vergrendelen.
+
+Waarom deze grens: Windows heeft geen publieke API voor virtuele bureaubladen. DeskVeil gebruikt
+[VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor), dat de interne interfaces
+volgt; die veranderen per Windows-versie.
+
+## Gebruik
+
+1. Klik met de rechtermuisknop op het slot-icoon in het systeemvak (soms verborgen achter **^**).
+2. Klik op een bureaublad om het te vergrendelen (🔒). Vergrendel je het bureaublad waar je nu op zit,
+   dan geldt de vergrendeling vanaf de volgende keer dat je er aankomt.
+3. Wissel naar dat bureaublad, op welke manier dan ook: het gordijn verschijnt en Windows Hello vraagt om
+   verificatie. Geslaagd: het bureaublad blijft open tot je het verlaat. Geannuleerd: het gordijn blijft,
+   met **Ontgrendelen** en **Naar vorige desktop**.
+
+| Menu-item | Functie |
+|---|---|
+| *bureaubladen* | Klik om te vergrendelen; 🔒 = vergrendeld, klik opnieuw om op te heffen (Windows Hello) |
+| Huidige desktop locken | Vergrendelt het bureaublad waarop je nu zit |
+| Opnieuw vergrendelen bij verlaten | Na ontgrendelen bij terugkomst opnieuw vragen (standaard aan) |
+| Instellingen-audit | Waarschuwt als de taakbalk of Alt+Tab vensters van alle bureaubladen toont |
+| Starten met Windows | Autostart aan/uit (dezelfde instelling als de checkbox in de installer) |
+| Logmap openen | Opent `%LOCALAPPDATA%\DeskVeil\logs` |
+| Afsluiten | Stopt DeskVeil |
+
 ## Wat het doet
 
-- Tray-icoon met een menu van al je bureaubladen; klik om een bureaublad te vergrendelen (🔒) of de
-  vergrendeling op te heffen (dat laatste vraagt Windows Hello).
-- Bij aankomst op een vergrendeld bureaublad: binnen ~100 ms een gordijn per monitor met de naam van het
-  bureaublad, daarna automatisch de Windows Hello-prompt, vóór het gordijn.
-- Geslaagd: het bureaublad blijft open tot je het verlaat. Kom je terug, dan wordt opnieuw gevraagd
-  (`relockOnLeave`, standaard aan; uit te zetten in het menu).
-- Geannuleerd of mislukt: het gordijn blijft, met **Ontgrendelen** en **Naar vorige desktop**.
+- Handhaving bij aankomst op een vergrendeld bureaublad, binnen ~100 ms, voor elke manier van wisselen:
+  Task View, Win+Ctrl+←/→, klikken in de taakbalk, Alt+Tab.
+- Een gordijn per monitor; de Windows Hello-prompt verschijnt ervóór.
 - Windows Hello niet beschikbaar: duidelijke melding, het bureaublad blijft vergrendeld, geen omweg.
-- Werkt voor elke manier van wisselen: Task View, Win+Ctrl+←/→, klikken in de taakbalk, Alt+Tab.
-- **Instellingen-audit**: waarschuwt als de taakbalk of Alt+Tab vensters van alle bureaubladen toont
-  (dan lekt de inhoud alsnog). DeskVeil past die instellingen niet zelf aan.
-- Optioneel automatisch starten met Windows (standaard uit).
+- Herstelt zich na een herstart van Verkenner (explorer.exe).
+- Waarschuwt (zonder iets aan te passen) als Windows zelf vensters van alle bureaubladen toont.
 
 ## Wat het bewust níet doet
 
@@ -37,63 +96,63 @@ geslaagde verificatie verdwijnt het gordijn.
 
 Meer achtergrond: [docs/architecture.md](docs/architecture.md).
 
-## Vereisten
+## Problemen melden
 
-- Windows 11 **24H2 of nieuwer** (x64). VirtualDesktopAccessor ondersteunt build 26100.2605+ en is getest
-  op 25H2 (26200).
-- **Windows Hello** ingesteld (Instellingen > Accounts > Aanmeldingsopties).
-- Om te bouwen: de [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+Open een [issue](https://github.com/Tommy-db-brothers/privacy-desktops-windows/issues) met je Windows-build
+(`winver`), de DeskVeil-versie (bovenaan het tray-menu) en het logbestand: tray-menu > **Logmap openen** >
+`deskveil.log`. De logs bevatten bureaublad-GUID's en -namen, geen inhoud van vensters.
 
-## Bouwen en testen
+## Voor ontwikkelaars
+
+Vereist: Windows 11 (x64) en de [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 ```powershell
 git clone https://github.com/Tommy-db-brothers/privacy-desktops-windows.git
 cd privacy-desktops-windows
 dotnet build
 dotnet test
-```
-
-Ontbreekt `lib/VirtualDesktopAccessor.dll`, dan downloadt de eerste build de vastgepinde release (zie
-[lib/README.md](lib/README.md)).
-
-Starten vanuit de broncode:
-
-```powershell
 dotnet run --project src/DeskVeil
 ```
 
-Self-contained single-file exe (geen .NET-installatie nodig op de doelmachine):
+`lib/VirtualDesktopAccessor.dll` staat in de repository; de build controleert de SHA-256 (zie
+[lib/README.md](lib/README.md)).
+
+Portable single-file exe:
 
 ```powershell
-dotnet publish src/DeskVeil/DeskVeil.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+dotnet publish src/DeskVeil/DeskVeil.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:Version=0.2.0 -o artifacts/portable
 ```
 
-Bij een tag `v*` bouwt GitHub Actions deze exe en hangt hem als asset aan de release.
+Installer (vereist [Inno Setup 6](https://jrsoftware.org/isinfo.php)):
 
-## Gebruik
+```powershell
+dotnet publish src/DeskVeil/DeskVeil.csproj -c Release -r win-x64 --self-contained true -p:Version=0.2.0 -o artifacts/app
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=0.2.0 installer\DeskVeil.iss
+```
 
-1. Start `DeskVeil.exe`; het slot-icoon verschijnt in het systeemvak.
-2. Rechtsklik op het icoon en klik op een bureaublad om het te vergrendelen. Vergrendel je het bureaublad
-   waar je nu op zit, dan geldt de vergrendeling vanaf de volgende keer dat je er aankomt.
-3. Wissel naar dat bureaublad: het gordijn verschijnt en Windows Hello vraagt om verificatie.
+De installer komt in `artifacts/`.
 
-| Menu-item | Functie |
-|---|---|
-| *bureaubladen* | Klik om te vergrendelen; 🔒 = vergrendeld, klik opnieuw om op te heffen (Windows Hello) |
-| Huidige desktop locken | Vergrendelt het bureaublad waarop je nu zit |
-| Opnieuw vergrendelen bij verlaten | `relockOnLeave` aan/uit |
-| Instellingen-audit | Controleert taakbalk- en Alt+Tab-instellingen |
-| Starten met Windows | Autostart via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
-| Afsluiten | Stopt DeskVeil |
+### CI en releases
 
-Instellingen staan in `%APPDATA%\DeskVeil\config.json`, gekeyed op de GUID van elk bureaublad. Logging gaat
-naar de debug-output (bekijken met Sysinternals DebugView).
+[`.github/workflows/build.yml`](.github/workflows/build.yml) bouwt en test bij elke push naar `main` en
+elke pull request, en uploadt de installer, de portable exe en `SHA256SUMS.txt` als workflow-artifact
+(versie `<VersionPrefix>-ci.<run>`). Een tag `v<versie>` maakt een GitHub Release met diezelfde bestanden:
 
-## Projectstructuur
+```powershell
+git checkout main
+git pull
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Werk daarna `VersionPrefix` in `Directory.Build.props` bij naar de volgende versie.
+
+### Projectstructuur
 
 ```
-src/DeskVeil/           tray-app (Config/, Desktops/, Guard/, Diagnostics/)
-src/DeskVeil.Tests/     xUnit-tests (ConfigStore, GuardCoordinator met fakes, settings-audit)
+src/DeskVeil/           tray-app (Config/, Desktops/, Guard/, Diagnostics/, Ui/)
+src/DeskVeil.Tests/     xUnit-tests
+installer/              Inno Setup-script (per-user installer)
 tools/ZBandProbe/       diagnostische test voor de Task View-z-band
 lib/                    VirtualDesktopAccessor.dll + licentie
 docs/                   architectuur en dreigingsmodel
@@ -104,7 +163,8 @@ docs/                   architectuur en dreigingsmodel
 Toegang tot virtuele bureaubladen gaat via
 [VirtualDesktopAccessor](https://github.com/Ciantic/VirtualDesktopAccessor) van Jari Pennanen (Ciantic),
 MIT-licentie; zie [lib/VirtualDesktopAccessor.LICENSE.txt](lib/VirtualDesktopAccessor.LICENSE.txt).
+De installer is gebouwd met [Inno Setup](https://jrsoftware.org/isinfo.php).
 
 ## Licentie
 
-MIT, © 2026 dB Brothers. Zie [LICENSE](LICENSE).
+MIT, © 2026 dB Brothers. Zie [LICENSE](LICENSE). Wijzigingen per versie: [CHANGELOG.md](CHANGELOG.md).

@@ -2,6 +2,7 @@ using System.Drawing.Drawing2D;
 using DeskVeil.Config;
 using DeskVeil.Diagnostics;
 using DeskVeil.Guard;
+using DeskVeil.Ui;
 
 namespace DeskVeil;
 
@@ -27,8 +28,12 @@ internal sealed class TrayController : IDisposable
             Visible = true,
         };
         _guard.Notification += OnNotification;
+        _guard.VerifierSetupRequired += OnVerifierSetupRequired;
         RebuildMenu();
     }
+
+    /// <summary>"DeskVeil 0.2.0" without the source revision suffix.</summary>
+    public static string ProductTitle => $"DeskVeil {Application.ProductVersion.Split('+')[0]}";
 
     public void ShowBalloon(string text, ToolTipIcon icon) =>
         _notifyIcon.ShowBalloonTip(5000, "DeskVeil", text, icon);
@@ -47,9 +52,17 @@ internal sealed class TrayController : IDisposable
         }
     }
 
+    /// <summary>Adds the icon to the (new) taskbar again, after explorer.exe restarted.</summary>
+    public void RestoreIcon()
+    {
+        _notifyIcon.Visible = false;
+        _notifyIcon.Visible = true;
+    }
+
     public void Dispose()
     {
         _guard.Notification -= OnNotification;
+        _guard.VerifierSetupRequired -= OnVerifierSetupRequired;
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _menu.Dispose();
@@ -57,6 +70,8 @@ internal sealed class TrayController : IDisposable
     }
 
     private void OnNotification(object? sender, string message) => ShowBalloon(message, ToolTipIcon.Warning);
+
+    private void OnVerifierSetupRequired(object? sender, VerifierStatus status) => Dialogs.ShowHelloSetup(status);
 
     private void RebuildMenu()
     {
@@ -67,7 +82,7 @@ internal sealed class TrayController : IDisposable
             item.Dispose();
         }
 
-        _menu.Items.Add(new ToolStripMenuItem("DeskVeil") { Enabled = false });
+        _menu.Items.Add(new ToolStripMenuItem(ProductTitle) { Enabled = false });
         _menu.Items.Add(new ToolStripSeparator());
 
         var current = _guard.CurrentDesktopId;
@@ -106,11 +121,22 @@ internal sealed class TrayController : IDisposable
         autostart.Click += (_, _) => ToggleAutostart();
         _menu.Items.Add(autostart);
 
+        var logs = new ToolStripMenuItem("Logmap openen");
+        logs.Click += (_, _) => OpenLogFolder();
+        _menu.Items.Add(logs);
+
         _menu.Items.Add(new ToolStripSeparator());
 
         var exit = new ToolStripMenuItem("Afsluiten");
         exit.Click += (_, _) => Application.Exit();
         _menu.Items.Add(exit);
+    }
+
+    private static void OpenLogFolder()
+    {
+        var folder = Log.FileDirectory ?? Log.DefaultDirectory;
+        Directory.CreateDirectory(folder);
+        Dialogs.Open(folder);
     }
 
     private void ToggleAutostart()

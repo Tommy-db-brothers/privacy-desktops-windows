@@ -8,7 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Deterministic>true</Deterministic>
 
-    <Version>0.1.0</Version>
+    <VersionPrefix>0.2.0</VersionPrefix>
     <Company>dB Brothers</Company>
     <Product>DeskVeil</Product>
     <Copyright>Copyright (c) 2026 dB Brothers</Copyright>

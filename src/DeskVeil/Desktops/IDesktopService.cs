@@ -8,6 +8,10 @@ public interface IDesktopService : IDisposable
     /// <summary>Starts listening for desktop switches.</summary>
     void Start();
 
+    /// <summary>Registers the switch listener again, for example after explorer.exe restarted.</summary>
+    /// <exception cref="InvalidOperationException">The listener could not be registered.</exception>
+    void Reconnect();
+
     /// <summary>All desktops in Task View order, or an empty list if they could not be enumerated.</summary>
     IReadOnlyList<DesktopInfo> GetDesktops();
 

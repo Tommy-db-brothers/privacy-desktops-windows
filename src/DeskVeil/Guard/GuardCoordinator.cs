@@ -33,6 +33,10 @@ public sealed class GuardCoordinator : IDisposable
     /// <summary>User-facing messages (shown as tray balloons).</summary>
     public event EventHandler<string>? Notification;
 
+    /// <summary>Raised instead of locking when no verification method is available, so the UI can
+    /// explain how to set up Windows Hello.</summary>
+    public event EventHandler<VerifierStatus>? VerifierSetupRequired;
+
     public Guid? CurrentDesktopId => _current;
 
     public bool RelockOnLeave => _store.Config.RelockOnLeave;
@@ -81,14 +85,44 @@ public sealed class GuardCoordinator : IDisposable
     }
 
     /// <summary>
+    /// After explorer.exe restarted (TaskbarCreated): registers the switch listener again, re-reads the
+    /// desktops and enforces at once, in case the active desktop changed or is locked.
+    /// </summary>
+    public void HandleShellRestarted()
+    {
+        Log.Info("The shell restarted; reconnecting to the virtual desktop notifications.");
+        try
+        {
+            _desktops.Reconnect();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log.Error("Reconnecting after a shell restart failed", ex);
+            Notify("Na een herstart van Verkenner kan DeskVeil bureaublad-wissels niet meer volgen. Start DeskVeil opnieuw.");
+        }
+
+        RefreshDesktops();
+        ArriveAt(_desktops.GetCurrentDesktopId());
+    }
+
+    /// <summary>
     /// Locks an unlocked desktop, or removes the lock after a successful verification.
     /// Locking the desktop you are on does not raise the curtain; it applies from the next arrival.
+    /// A lock is only set when a verification method exists; otherwise <see cref="VerifierSetupRequired"/> is raised.
     /// </summary>
     public async Task ToggleLockAsync(Guid desktopId)
     {
         var name = NameOf(desktopId);
         if (!IsLocked(desktopId))
         {
+            var status = await CheckVerifierAsync();
+            if (!status.CanVerify)
+            {
+                Log.Warn($"Not locking desktop {desktopId}: no verification method ({status.Detail}).");
+                VerifierSetupRequired?.Invoke(this, status);
+                return;
+            }
+
             _store.Config.SetLocked(desktopId, true, name);
             if (desktopId == _current)
             {
@@ -139,7 +173,12 @@ public sealed class GuardCoordinator : IDisposable
     private void OnCurrentDesktopChanged(object? sender, DesktopChangedEventArgs e)
     {
         RefreshDesktops();
-        if (e.CurrentId is not Guid arrived)
+        ArriveAt(e.CurrentId);
+    }
+
+    private void ArriveAt(Guid? currentId)
+    {
+        if (currentId is not Guid arrived)
         {
             // The shell is mid-transition (for example the active desktop is being removed);
             // the event that follows the transition settles the state.
@@ -263,6 +302,19 @@ public sealed class GuardCoordinator : IDisposable
         finally
         {
             _verification = null;
+        }
+    }
+
+    private async Task<VerifierStatus> CheckVerifierAsync()
+    {
+        try
+        {
+            return await _verifier.CheckAvailabilityAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Checking the verifier failed", ex);
+            return new VerifierStatus(false, false, ex.Message);
         }
     }
 

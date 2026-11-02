@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\installer\DeskVeil.iss" Link="DeskVeil.iss" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DeskVeil\DeskVeil.csproj" />
   </ItemGroup>
 
